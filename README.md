@@ -5,3 +5,19 @@
 Exira.VersionHeader.Owin is an OWIN middleware to add assembly version information to HTTP headers.
 
 ### Usage
+
+Use the ```UseVersionHeader``` extension method with a ```VersionHeaderOptions```.
+
+Pass in the ```System.Type``` of the assembly you wish the version information to be included in the HTTP header.
+
+Using this from F# can be done as follows:
+
+``` fsharp
+let registerVersionHeader (app: IAppBuilder) =
+    let config =
+        VersionHeaderOptions(
+            versionType = typedefof<Startup>,
+            HeaderName = "Release")
+
+    app.UseVersionHeader(config) |> ignore
+```
