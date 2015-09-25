@@ -21,3 +21,7 @@ let registerVersionHeader (app: IAppBuilder) =
 
     app.UseVersionHeader(config) |> ignore
 ```
+
+## Cloning
+
+```git clone git@github.com:exira/versionheader-owin.git -c core.autocrlf=input```
