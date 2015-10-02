@@ -1,14 +1,12 @@
-// --------------------------------------------------------------------------------------
-// FAKE build script
-// --------------------------------------------------------------------------------------
+open System
+open System.IO
 
 #r @"packages/FAKE/tools/FakeLib.dll"
 open Fake
 open Fake.Git
 open Fake.AssemblyInfoFile
 open Fake.ReleaseNotesHelper
-open System
-open System.IO
+
 #if MONO
 #else
 #load "packages/SourceLink.Fake/tools/Fake.fsx"
@@ -75,14 +73,29 @@ let (|Fsproj|Csproj|Vbproj|) (projFileName:string) =
     | f when f.EndsWith("vbproj") -> Vbproj
     | _                           -> failwith (sprintf "Project file %s not supported. Unknown project type." projFileName)
 
+let buildNumber =
+    match environVar "BUILD_NUMBER" with
+    | ""
+    | null -> "0"
+    | _ as nr -> nr
+
+let commitHash =
+    match environVar "BUILD_VCS_NUMBER" with
+    | ""
+    | null -> Information.getCurrentSHA1(".")
+    | _ as sha -> sha
+
 // Generate assembly info files with the right version & up-to-date information
 Target "AssemblyInfo" (fun _ ->
+    log (sprintf "##teamcity[buildNumber '%s.%s']" release.AssemblyVersion buildNumber)
+
     let getAssemblyInfoAttributes projectName =
         [ Attribute.Title (projectName)
           Attribute.Product project
           Attribute.Description summary
-          Attribute.Version release.AssemblyVersion
-          Attribute.FileVersion release.AssemblyVersion ]
+          Attribute.Version (sprintf "%s.%s" release.AssemblyVersion buildNumber)
+          Attribute.FileVersion (sprintf "%s.%s" release.AssemblyVersion buildNumber)
+          Attribute.Metadata("githash", commitHash) ]
 
     let getProjectDetails projectPath =
         let projectName = System.IO.Path.GetFileNameWithoutExtension(projectPath)
@@ -126,9 +139,13 @@ Target "CleanDocs" (fun _ ->
 // Build library & test project
 
 Target "Build" (fun _ ->
+    log "##teamcity[progressStart 'Build']"
+
     !! solutionFile
     |> MSBuildRelease "" "Rebuild"
     |> ignore
+
+    log "##teamcity[progressFinish 'Build']"
 )
 
 // --------------------------------------------------------------------------------------
@@ -178,17 +195,22 @@ Target "SourceLink" (fun _ ->
 // Build a NuGet package
 
 Target "NuGet" (fun _ ->
+    log "##teamcity[progressStart 'NuGet']"
+
     Paket.Pack(fun p ->
         { p with
             OutputPath = "bin"
-            Version = release.NugetVersion
+            Version = (sprintf "%s.%s" release.NugetVersion buildNumber)
             ReleaseNotes = toLines release.Notes})
+
+    log "##teamcity[progressFinish 'NuGet']"
 )
 
 Target "PublishNuget" (fun _ ->
-    Paket.Push(fun p ->
-        { p with
-            WorkingDir = "bin" })
+    ()
+    //Paket.Push(fun p ->
+    //    { p with
+    //        WorkingDir = "bin" })
 )
 
 
@@ -305,9 +327,10 @@ Target "ReleaseDocs" (fun _ ->
     CleanDir tempDocsDir
     Repository.cloneSingleBranch "" (gitHome + "/" + gitName + ".git") "gh-pages" tempDocsDir
 
+    ensureDirectory "docs/output"
     CopyRecursive "docs/output" tempDocsDir true |> tracefn "%A"
     StageAll tempDocsDir
-    Git.Commit.Commit tempDocsDir (sprintf "Update generated documentation for version %s" release.NugetVersion)
+    Git.Commit.Commit tempDocsDir (sprintf "Update generated documentation for version %s.%s" release.NugetVersion buildNumber)
     Branches.push tempDocsDir
 )
 
@@ -315,19 +338,23 @@ Target "ReleaseDocs" (fun _ ->
 open Octokit
 
 Target "Release" (fun _ ->
+    log "##teamcity[progressStart 'Release']"
+
     StageAll ""
-    Git.Commit.Commit "" (sprintf "Bump version to %s" release.NugetVersion)
+    Git.Commit.Commit "" (sprintf "Bump version to %s.%s" release.NugetVersion buildNumber)
     Branches.push ""
 
-    Branches.tag "" release.NugetVersion
-    Branches.pushTag "" "origin" release.NugetVersion
+    Branches.tag "" (sprintf "%s.%s" release.NugetVersion buildNumber)
+    Branches.pushTag "" "origin" (sprintf "%s.%s" release.NugetVersion buildNumber)
 
     // release on github
     createClient (getBuildParamOrDefault "github-user" "") (getBuildParamOrDefault "github-pw" "")
-    |> createDraft gitOwner gitName release.NugetVersion (release.SemVer.PreRelease <> None) release.Notes
+    |> createDraft gitOwner gitName (sprintf "%s.%s" release.NugetVersion buildNumber) (release.SemVer.PreRelease <> None) release.Notes
     // TODO: |> uploadFile "PATH_TO_FILE"
     |> releaseDraft
     |> Async.RunSynchronously
+
+    log "##teamcity[progressFinish 'Release']"
 )
 
 Target "BuildPackage" DoNothing
@@ -342,10 +369,10 @@ Target "All" DoNothing
   ==> "Build"
   ==> "CopyBinaries"
   ==> "RunTests"
-  =?> ("GenerateReferenceDocs",isLocalBuild)
-  =?> ("GenerateDocs",isLocalBuild)
+  ==> "GenerateReferenceDocs"
+  ==> "GenerateDocs"
   ==> "All"
-  =?> ("ReleaseDocs",isLocalBuild)
+  ==> "ReleaseDocs"
 
 "All"
 #if MONO

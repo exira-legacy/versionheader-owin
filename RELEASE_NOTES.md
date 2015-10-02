@@ -1,3 +1,6 @@
+#### 0.1 - October 2 2015
+* Switch everything over to our TeamCity/Octopus Deploy infrastructure
+
 #### 0.0.2 - September 26 2015
 * Upgrade dependencies
 * Use F# 4.0
