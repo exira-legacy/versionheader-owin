@@ -4,6 +4,9 @@
 .fake/
 
 
+.fake/
+.vs/
+
 # User-specific files
 *.suo
 *.user
