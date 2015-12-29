@@ -19,3 +19,8 @@ summary
     Exira.VersionHeader.Owin is an OWIN middleware to add assembly version information to HTTP headers
 description
     Exira.VersionHeader.Owin is an OWIN middleware to add assembly version information to HTTP headers
+files
+    bin/Release/net45/Exira.VersionHeader.Owin.* ==> lib/net45/
+    bin/Release/net452/Exira.VersionHeader.Owin.* ==> lib/net452/
+    bin/Release/net46/Exira.VersionHeader.Owin.* ==> lib/net46/
+    bin/Release/net461/Exira.VersionHeader.Owin.* ==> lib/net461/

@@ -3,6 +3,7 @@
 .fake/
 .vs/
 sshenv.bat
+docs/tools/FSharp.Formatting.svclog
 
 # User-specific files
 *.suo
