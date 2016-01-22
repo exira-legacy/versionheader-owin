@@ -148,6 +148,9 @@ Target "Build" (fun _ ->
     |> MSBuild "" "Rebuild" [ "Configuration", "Release45" ] |> ignore
 
     !! solutionFile
+    |> MSBuild "" "Rebuild" [ "Configuration", "Release451" ] |> ignore
+
+    !! solutionFile
     |> MSBuild "" "Rebuild" [ "Configuration", "Release452" ] |> ignore
 
     !! solutionFile
